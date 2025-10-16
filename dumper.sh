@@ -814,60 +814,64 @@ fi
 
 # Extract Partitions
 for p in $PARTITIONS; do
-	if ! echo "${p}" | grep -q "boot\|recovery\|dtbo\|vendor_boot\|tz"; then
-		if [[ -e "$p.img" ]]; then
-			mkdir "$p" 2> /dev/null || rm -rf "${p:?}"/*
-			echo "Extracting $p partition..."
-			${BIN_7ZZ} x -snld "$p".img -y -o"$p"/ > /dev/null 2>&1
-			if [ $? -eq 0 ]; then
-				rm "$p".img > /dev/null 2>&1
-			else
-				echo "Extraction failed by 7z."
-				if [ -f "$p.img" ] && [ "$p" != "modem" ]; then
-					echo "Couldn't extract $p partition by 7z. Trying fsck.erofs..."
-					rm -rf "${p}"/*
-					"${FSCK_EROFS}" --extract="$p" "$p".img > /dev/null 2>&1
-					if [ $? -eq 0 ]; then
-						rm -fv "$p".img > /dev/null 2>&1
-					else
-						echo "EROFS extraction failed. Trying mount loop..."
-						sudo mount -o loop -t auto "$p".img "$p" 2>/dev/null
-						if [ $? -ne 0 ]; then
-							echo "Mount failed. Trying F2FS extraction..."
-								mkdir -p "F2FS_${p}"
-								"${EXTRACT_F2FS}" -o "F2FS_${p}" "$p.img" >> /dev/null 2>&1
-								if [ $? -eq 0 ]; then
-									cp -rf "F2FS_${p}/"* "$p"/
-									rm -rf "F2FS_${p}"
-									rm -fv "$p".img > /dev/null 2>&1
-									echo "$p partition extracted successfully using extract.f2fs."
-								else
-									echo "extract.f2fs failed on $p.img."
-									echo "Couldn't extract $p partition. It might use an unsupported filesystem."
-									echo "For EROFS: Linux 5.4+ required. For F2FS: Linux 5.15+ recommended."
-								fi
-							else
-								echo "extract.f2fs binary not found! Skipping F2FS extraction."
-							fi
-						else
-							mkdir "${p}_"
-							sudo cp -rf "${p}/"* "${p}_"
-							sudo umount "${p}"
-							sudo cp -rf "${p}_/"* "${p}"
-							sudo rm -rf "${p}_"
-							sudo chown -R "$(whoami)" "${p}"/*
-							chmod -R u+rwX "${p}"/*
-							if [ $? -eq 0 ]; then
-								rm -fv "$p".img > /dev/null 2>&1
-							fi
-						fi
-					fi
-				fi
-			fi
-		fi
-	fi
-done
+    if ! echo "${p}" | grep -q "boot\|recovery\|dtbo\|vendor_boot\|tz"; then
+        if [[ -e "$p.img" ]]; then
+            mkdir "$p" 2> /dev/null || rm -rf "${p:?}"/*
+            echo "Extracting $p partition..."
 
+            ${BIN_7ZZ} x -snld "$p".img -y -o"$p"/ > /dev/null 2>&1
+            if [ $? -eq 0 ]; then
+                rm "$p".img > /dev/null 2>&1
+            else
+                echo "Extraction failed by 7z."
+                if [ -f "$p.img" ] && [ "$p" != "modem" ]; then
+                    echo "Couldn't extract $p partition by 7z. Trying fsck.erofs..."
+                    rm -rf "${p}"/*
+                    "${FSCK_EROFS}" --extract="$p" "$p".img > /dev/null 2>&1
+
+                    if [ $? -eq 0 ]; then
+                        rm -fv "$p".img > /dev/null 2>&1
+                    else
+                        echo "EROFS extraction failed. Trying mount loop..."
+                        sudo mount -o loop -t auto "$p".img "$p" 2>/dev/null
+
+                        if [ $? -ne 0 ]; then
+                            echo "Mount failed. Trying F2FS extraction..."
+                            if [ -n "${EXTRACT_F2FS}" ] && [ -x "${EXTRACT_F2FS}" ]; then
+                                mkdir -p "F2FS_${p}"
+                                "${EXTRACT_F2FS}" -o "F2FS_${p}" "$p.img" >> /dev/null 2>&1
+
+                                if [ $? -eq 0 ]; then
+                                    cp -rf "F2FS_${p}/"* "$p"/
+                                    rm -rf "F2FS_${p}"
+                                    rm -fv "$p".img > /dev/null 2>&1
+                                    echo "$p partition extracted successfully using extract.f2fs."
+                                else
+                                    echo "extract.f2fs failed on $p.img."
+                                    echo "Couldn't extract $p partition. It might use an unsupported filesystem."
+                                    echo "For EROFS: Linux 5.4+ required. For F2FS: Linux 5.15+ recommended."
+                                fi
+                            else
+                                echo "extract.f2fs binary not found! Skipping F2FS extraction."
+                            fi
+                        else
+                            mkdir "${p}_"
+                            sudo cp -rf "${p}/"* "${p}_"
+                            sudo umount "${p}"
+                            sudo cp -rf "${p}_/"* "${p}"
+                            sudo rm -rf "${p}_"
+                            sudo chown -R "$(whoami)" "${p}"/*
+                            chmod -R u+rwX "${p}"/*
+                            if [ $? -eq 0 ]; then
+                                rm -fv "$p".img > /dev/null 2>&1
+                            fi
+                        fi
+                    fi
+                fi
+            fi
+        fi
+    fi
+done
 
 # Remove Unnecessary Image Leftover From OUTDIR
 for q in *.img; do
