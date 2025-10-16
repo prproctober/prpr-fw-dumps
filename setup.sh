@@ -29,6 +29,31 @@ function __bannerTop() {
 	"${NORMAL}
 }
 
+function check_f2fs_support() {
+    echo -e ${BLUE}">> Checking F2FS filesystem support..."${NORMAL}
+    sleep 1
+
+    if grep -q f2fs /proc/filesystems; then
+        echo -e ${GREEN}"F2FS already supported by kernel."${NORMAL}
+        return
+    fi
+
+    if sudo modprobe f2fs 2>/dev/null; then
+        echo -e ${GREEN}"Loaded f2fs module successfully."${NORMAL}
+        return
+    fi
+
+    echo -e ${PURPLE}"F2FS module not found. Installing build tools..."${NORMAL}
+    sleep 1
+    sudo apt install -y linux-headers-$(uname -r) build-essential f2fs-tools || abort "Failed to install headers or tools."
+
+    if sudo modprobe f2fs 2>/dev/null; then
+        echo -e ${GREEN}"F2FS module loaded successfully after installation."${NORMAL}
+    else
+        echo -e ${RED}"Kernel does not include F2FS sources. You may need to build manually."${NORMAL}
+    fi
+}
+
 # Welcome Banner
 printf "\e[32m" && __bannerTop && printf "\e[0m"
 
@@ -82,6 +107,8 @@ elif [[ "$OSTYPE" == "darwin"* ]]; then
 fi
 
 sleep 1
+
+check_f2fs_support
 
 # Install `uv`
 echo -e ${BLUE}">> Installing uv for python packages..."${NORMAL}
