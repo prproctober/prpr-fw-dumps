@@ -1164,6 +1164,7 @@ commit_and_push(){
 	[ -e ".gitattributes" ] || find . -type f -not -path ".git/*" -size +100M -exec git lfs track {} \;
 	[ -e ".gitattributes" ] && {
 		git add ".gitattributes"
+		git branch -m "${fingerprint}"
 		git commit -sm "Setup Git LFS"
 		git push -u origin "${branch}"
 	}
