@@ -51,6 +51,8 @@ function check_f2fs_support() {
         echo -e ${GREEN}"F2FS module loaded successfully after installation."${NORMAL}
     else
         echo -e ${RED}"Kernel does not include F2FS sources. You may need to build manually."${NORMAL}
+	echo -e ${PURPLE}"Adding extract.f2fs to /usr/bin [.]"${NORMAL}
+	sudo -c "cp -r utils/bin/extract.f2fs /usr/bin/"
     fi
 }
 

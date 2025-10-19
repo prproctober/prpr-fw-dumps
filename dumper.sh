@@ -108,7 +108,7 @@ OFP_QC_DECRYPT="${UTILSDIR}"/oppo_decrypt/ofp_qc_decrypt.py
 OFP_MTK_DECRYPT="${UTILSDIR}"/oppo_decrypt/ofp_mtk_decrypt.py
 OPSDECRYPT="${UTILSDIR}"/oppo_decrypt/opscrypto.py
 LPUNPACK="${UTILSDIR}"/lpunpack
-EXTRACT_F2FS="${UTILSDIR}"/extract.f2fs
+EXTRACT_F2FS=extract.f2fs
 SPLITUAPP="${UTILSDIR}"/splituapp.py
 PACEXTRACTOR="${UTILSDIR}"/pacextractor/python/pacExtractor.py
 NB0_EXTRACT="${UTILSDIR}"/nb0-extract
@@ -814,63 +814,74 @@ fi
 
 # Extract Partitions
 for p in $PARTITIONS; do
-    if ! echo "${p}" | grep -q "boot\|recovery\|dtbo\|vendor_boot\|tz"; then
-        if [[ -e "$p.img" ]]; then
-            mkdir "$p" 2> /dev/null || rm -rf "${p:?}"/*
-            echo "Extracting $p partition..."
+	if ! echo "${p}" | grep -q "boot\|recovery\|dtbo\|vendor_boot\|tz"; then
+		if [[ -e "$p.img" ]]; then
+			mkdir "$p" 2> /dev/null || rm -rf "${p:?}"/*
+			echo "Extracting $p partition..."
+			${BIN_7ZZ} x -snld "$p".img -y -o"$p"/ > /dev/null 2>&1
+			if [ $? -eq 0 ]; then
+				rm "$p".img > /dev/null 2>&1
+			else
+				# Handling EROFS Images, which can't be handled by 7z.
+				echo "Extraction failed by 7z."
+				if [ -f "$p.img" ] && [ "$p" != "modem" ]; then
+					echo "Couldn't extract $p partition by 7z. Using fsck.erofs."
+					rm -rf "${p}"/*
+					"${FSCK_EROFS}" --extract="$p" "$p".img > /dev/null 2>&1
+					if [ $? -eq 0 ]; then
+						rm -fv "$p".img > /dev/null 2>&1
+					else
+						echo "Couldn't extract $p partition by fsck.erofs. Using mount loop."
+						sudo mount -o loop -t auto "$p".img "$p" 2>/dev/null
+						if [ $? -ne 0 ]; then
+							echo "Mount failed. Trying extract.f2fs..."
 
-            ${BIN_7ZZ} x -snld "$p".img -y -o"$p"/ > /dev/null 2>&1
-            if [ $? -eq 0 ]; then
-                rm "$p".img > /dev/null 2>&1
-            else
-                echo "Extraction failed by 7z."
-                if [ -f "$p.img" ] && [ "$p" != "modem" ]; then
-                    echo "Couldn't extract $p partition by 7z. Trying fsck.erofs..."
-                    rm -rf "${p}"/*
-                    "${FSCK_EROFS}" --extract="$p" "$p".img > /dev/null 2>&1
+							if [[ -x "${EXTRACT_F2FS}" ]]; then
+								F2FS_BIN="${EXTRACT_F2FS}"
+							elif command -v extract.f2fs >/dev/null 2>&1; then
+								F2FS_BIN="$(command -v extract.f2fs)"
+							else
+								F2FS_BIN=""
+							fi
 
-                    if [ $? -eq 0 ]; then
-                        rm -fv "$p".img > /dev/null 2>&1
-                    else
-                        echo "EROFS extraction failed. Trying mount loop..."
-                        sudo mount -o loop -t auto "$p".img "$p" 2>/dev/null
-
-                        if [ $? -ne 0 ]; then
-                            echo "Mount failed. Trying F2FS extraction..."
-                            if [ -n "${EXTRACT_F2FS}" ] && [ -x "${EXTRACT_F2FS}" ]; then
-                                mkdir -p "F2FS_${p}"
-                                "${EXTRACT_F2FS}" -o "F2FS_${p}" "$p.img" >> /dev/null 2>&1
-
-                                if [ $? -eq 0 ]; then
-                                    cp -rf "F2FS_${p}/"* "$p"/
-                                    rm -rf "F2FS_${p}"
-                                    rm -fv "$p".img > /dev/null 2>&1
-                                    echo "$p partition extracted successfully using extract.f2fs."
-                                else
-                                    echo "extract.f2fs failed on $p.img."
-                                    echo "Couldn't extract $p partition. It might use an unsupported filesystem."
-                                    echo "For EROFS: Linux 5.4+ required. For F2FS: Linux 5.15+ recommended."
-                                fi
-                            else
-                                echo "extract.f2fs binary not found! Skipping F2FS extraction."
-                            fi
-                        else
-                            mkdir "${p}_"
-                            sudo cp -rf "${p}/"* "${p}_"
-                            sudo umount "${p}"
-                            sudo cp -rf "${p}_/"* "${p}"
-                            sudo rm -rf "${p}_"
-                            sudo chown -R "$(whoami)" "${p}"/*
-                            chmod -R u+rwX "${p}"/*
-                            if [ $? -eq 0 ]; then
-                                rm -fv "$p".img > /dev/null 2>&1
-                            fi
-                        fi
-                    fi
-                fi
-            fi
-        fi
-    fi
+							if [[ -n "$F2FS_BIN" ]]; then
+								mkdir -p "F2FS_${p}"
+								"$F2FS_BIN" -o "F2FS_${p}" "$p.img" >> /dev/null 2>&1
+								if [ $? -eq 0 ]; then
+									cp -rf "F2FS_${p}/"* "$p"/
+									rm -rf "F2FS_${p}"
+									rm -fv "$p".img > /dev/null 2>&1
+									echo "$p partition extracted successfully using extract.f2fs."
+								else
+									echo "extract.f2fs failed on $p.img."
+									echo "Couldn't extract $p partition. It might use an unsupported filesystem."
+									echo "For EROFS: make sure you're using Linux 5.4+ kernel."
+									echo "For F2FS: make sure you're using Linux 5.15+ kernel."
+								fi
+							else
+								echo "extract.f2fs not found in utils/bin or globally in PATH."
+							fi
+						else
+							mkdir "${p}_"
+							sudo cp -rf "${p}/"* "${p}_"
+							sudo umount "${p}"
+							sudo cp -rf "${p}_/"* "${p}"
+							sudo rm -rf "${p}_"
+							sudo chown -R "$(whoami)" "${p}"/*
+							chmod -R u+rwX "${p}"/*
+							if [ $? -eq 0 ]; then
+								rm -fv "$p".img > /dev/null 2>&1
+							else
+								echo "Couldn't extract $p partition. It might use an unsupported filesystem."
+								echo "For EROFS: make sure you're using Linux 5.4+ kernel."
+								echo "For F2FS: make sure you're using Linux 5.15+ kernel."
+							fi
+						fi
+					fi
+				fi
+			fi
+		fi
+	fi
 done
 
 # Remove Unnecessary Image Leftover From OUTDIR
@@ -901,8 +912,16 @@ if [ -e "${OUTDIR}"/vendor/build.prop ]; then
 fi
 sort -u < "${TMPDIR}"/board-info.txt > "${OUTDIR}"/board-info.txt
 
-# set variables
-[[ $(find "$(pwd)"/system "$(pwd)"/system/system "$(pwd)"/vendor "$(pwd)"/*product -maxdepth 1 -type f -name "build*.prop" 2>/dev/null | sort -u | gawk '{print $NF}') ]] || { printf "No system/vendor/product build*.prop found, pushing cancelled.\n" && exit 1; }
+# Look recursively for build.prop files in key partitions
+FOUND_PROPS=$(find system vendor product odm system_ext -type f -name "build*.prop" 2>/dev/null | sort -u)
+
+if [[ -z "$FOUND_PROPS" ]]; then
+    echo "No system/vendor/product build*.prop found, pushing cancelled."
+    exit 1
+else
+    echo "Found build.prop files:"
+    echo "$FOUND_PROPS"
+fi
 
 flavor=$(grep -m1 -oP "(?<=^ro.build.flavor=).*" -hs {system,system/system,vendor}/build*.prop)
 [[ -z "${flavor}" ]] && flavor=$(grep -m1 -oP "(?<=^ro.vendor.build.flavor=).*" -hs vendor/build*.prop)
