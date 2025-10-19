@@ -1224,7 +1224,7 @@ if [[ -s "${PROJECT_DIR}"/.github_token ]]; then
 	printf "\n\nStarting Git Init...\n"
 	git init		# Insure Your Github Authorization Before Running This Script
 	git config --global http.postBuffer 524288000		# A Simple Tuning to Get Rid of curl (18) error while `git push`
-	git checkout -b "${branch}" || { git checkout -b "${incremental}" && export branch="${incremental}"; }
+	git checkout -b "${incremental}"
 	find . \( -name "*sensetime*" -o -name "*.lic" \) | cut -d'/' -f'2-' >| .gitignore
 	[[ ! -s .gitignore ]] && rm .gitignore
 	if [[ "${GIT_ORG}" == "${GIT_USER}" ]]; then
@@ -1292,7 +1292,7 @@ elif [[ -s "${PROJECT_DIR}"/.gitlab_token ]]; then
 
 	git init		# Insure Your GitLab Authorization Before Running This Script
 	git config --global http.postBuffer 524288000		# A Simple Tuning to Get Rid of curl (18) error while `git push`
-	git checkout -b "${branch}" || { git checkout -b "${incremental}" && export branch="${incremental}"; }
+    git checkout -b "${incremental}"
 	find . \( -name "*sensetime*" -o -name "*.lic" \) | cut -d'/' -f'2-' >| .gitignore
 	[[ ! -s .gitignore ]] && rm .gitignore
 	[[ -z "$(git config --get user.email)" ]] && git config user.email "guptasushrut@gmail.com"
