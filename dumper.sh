@@ -835,7 +835,7 @@ for p in $PARTITIONS; do
 						sudo mount -o loop -t auto "$p".img "$p" 2>/dev/null
 						if [ $? -ne 0 ]; then
 							echo "Mount failed. Trying extract.f2fs..."
-
+                            git config --global init.defaultBranch default
 							if [[ -x "${EXTRACT_F2FS}" ]]; then
 								F2FS_BIN="${EXTRACT_F2FS}"
 							elif command -v extract.f2fs >/dev/null 2>&1; then
