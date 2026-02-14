@@ -848,7 +848,7 @@ for p in $PARTITIONS; do
 								mkdir -p "F2FS_${p}"
 								"$F2FS_BIN" -o "F2FS_${p}" "$p.img" >> /dev/null 2>&1
 								if [ $? -eq 0 ]; then
-									cp -rf "F2FS_${p}/${p}/${p}"* "$p"/
+									cp -rf "F2FS_${p}/${p}/"* "$p"/
 									rm -rf "F2FS_${p}"
 									rm -fv "$p".img > /dev/null 2>&1
 									echo "$p partition extracted successfully using extract.f2fs."
